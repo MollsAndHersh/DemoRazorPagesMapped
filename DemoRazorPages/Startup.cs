@@ -74,6 +74,7 @@ namespace DemoRazorPages
                 branched.Use((con, next) =>
                 {
                     var scope = Tenant1ServiceProvider.CreateScope();
+                    con.RequestServices = scope.ServiceProvider;
                     // con.
                     con.Response.RegisterForDispose(scope);
                     return next.Invoke();
