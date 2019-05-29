@@ -1,16 +1,17 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace DemoRazorPages
 {
+
     public class Startup
     {
         public Startup(IConfiguration configuration)
@@ -19,51 +20,106 @@ namespace DemoRazorPages
         }
 
         public IConfiguration Configuration { get; }
-
         public IServiceProvider Tenant1ServiceProvider { get; set; }
         public IServiceProvider Tenant2ServiceProvider { get; set; }
+
+        public bool RunInMappedPipeline { get; set; } = true;
 
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<CookiePolicyOptions>(options =>
+            //services.Configure<CookiePolicyOptions>(options =>
+            //{
+            //    // This lambda determines whether user consent for non-essential cookies is needed for a given request.
+            //    options.CheckConsentNeeded = context => true;
+            //});
+            // services.AddRouting();
+
+            if (!RunInMappedPipeline)
             {
-                // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-                options.CheckConsentNeeded = context => true;
-            });
+                services.AddRazorPages()
+                .AddNewtonsoftJson();
+                return;
+            }
 
 
-            services.AddRazorPages((options) => { options.RootDirectory = "/T1"; })
+            var tenant1Services = new ServiceCollection();
+            tenant1Services.AddLogging();
+            tenant1Services.AddRouting();
+            tenant1Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+            var tenant2Services = new ServiceCollection();
+            tenant2Services.AddRouting();
+            tenant2Services.AddLogging();
+            tenant2Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+            tenant1Services.AddRazorPages((options) => { options.RootDirectory = "/T1"; })
                 .AddNewtonsoftJson();
 
-            Tenant1ServiceProvider = services.BuildServiceProvider();
+            //tenant1Services.AddRazorPages()
+            //   .AddNewtonsoftJson();
 
-            services.AddRazorPages((options) => { options.RootDirectory = "/T2"; })
+            Tenant1ServiceProvider = tenant1Services.BuildServiceProvider();
+
+            tenant2Services.AddRazorPages((options) => { options.RootDirectory = "/T2"; })
                 .AddNewtonsoftJson();
 
-            Tenant2ServiceProvider = services.BuildServiceProvider();
+            Tenant2ServiceProvider = tenant2Services.BuildServiceProvider();
 
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-            else
-            {
-                app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
-            }
+            //if (env.IsDevelopment())
+            //{
+            //    app.UseDeveloperExceptionPage();
+            //}
+            //else
+            //{
+            //    app.UseExceptionHandler("/Error");
+            //    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            //    // app.UseHsts();
+            //}
 
-            app.UseHttpsRedirection();
+            //  app.UseHttpsRedirection();
             app.UseStaticFiles();
 
-            app.UseCookiePolicy();
+            //app.UseCookiePolicy();
+
+            if (!RunInMappedPipeline)
+            {
+                app.UseRouting();
+                app.UseAuthorization();
+                app.Use((con, next) =>
+                {
+                    var sp = con.RequestServices;
+                    var partManager = sp.GetRequiredService<ApplicationPartManager>();
+                    return next.Invoke();
+                });
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapRazorPages();
+                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    var httpContextServices = sp.HttpContext?.RequestServices;
+                    // endpoints.ServiceProvider = httpContextServices;
+
+                    foreach (var dataSource in endpoints.DataSources)
+                    {
+                        foreach (var endpoint in dataSource.Endpoints)
+                        {
+                            var name = endpoint.DisplayName;
+                            foreach (var meta in endpoint.Metadata)
+                            {
+                                var objString = meta.ToString();
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
 
             app.MapWhen((c) =>
             {
@@ -89,7 +145,31 @@ namespace DemoRazorPages
                 branched.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
+                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    var httpContextServices = sp.HttpContext?.RequestServices;
+                    // endpoints.ServiceProvider = httpContextServices;
+
+                    foreach (var dataSource in endpoints.DataSources)
+                    {
+                        foreach (var endpoint in dataSource.Endpoints)
+                        {
+                            var name = endpoint.DisplayName;
+                            foreach (var meta in endpoint.Metadata)
+                            {
+                                var objString = meta.ToString();
+                            }
+                        }
+                    }
                 });
+
+
+                branched.Use((con, next) =>
+                {
+                    var sp = con.RequestServices;
+                    var partManager = sp.GetRequiredService<ApplicationPartManager>();
+                    return next.Invoke();
+                });
+                //branched.UseEndpointExecutor();
             });
 
             app.MapWhen((c) =>
@@ -113,11 +193,37 @@ namespace DemoRazorPages
                 });
                 branched.UseRouting();
                 branched.UseAuthorization();
+
                 branched.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
+                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    var httpContextServices = sp.HttpContext?.RequestServices;
+                    // endpoints.ServiceProvider = httpContextServices;
+
+                    foreach (var dataSource in endpoints.DataSources)
+                    {
+                        foreach (var endpoint in dataSource.Endpoints)
+                        {
+                            var name = endpoint.DisplayName;
+                            foreach (var meta in endpoint.Metadata)
+                            {
+                                var objString = meta.ToString();
+                            }
+                        }
+                    }
+                });
+
+
+                branched.Use((con, next) =>
+                {
+                    var sp = con.RequestServices;
+                    var partManager = sp.GetRequiredService<ApplicationPartManager>();
+                    return next.Invoke();
                 });
             });
+
+
 
 
 
