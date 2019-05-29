@@ -25,97 +25,63 @@ namespace DemoRazorPages
 
         public bool RunInMappedPipeline { get; set; } = true;
 
-
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            //services.Configure<CookiePolicyOptions>(options =>
-            //{
-            //    // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-            //    options.CheckConsentNeeded = context => true;
-            //});
-            // services.AddRouting();
+            RegisterApplicationServices(services);
+            Tenant1ServiceProvider = RegisterTenantServices(new ServiceCollection(), "/T1").BuildServiceProvider();
+            Tenant2ServiceProvider = RegisterTenantServices(new ServiceCollection(), "/T2").BuildServiceProvider();
+        }
 
-            if (!RunInMappedPipeline)
+        public void RegisterApplicationServices(IServiceCollection services)
+        {
+
+            if (!RunInMappedPipeline) // We are going to run razor pages in normal application request pipeline.
             {
-                services.AddRazorPages()
-                .AddNewtonsoftJson();
-                return;
+                services.AddLogging();
+                services.AddRouting();
+                services.AddRazorPages().AddNewtonsoftJson();
+            }
+        }
+
+        public IServiceCollection RegisterTenantServices(IServiceCollection services, string razorPath)
+        {
+            if(RunInMappedPipeline)
+            {
+                services.AddLogging();
+                services.AddRouting();
+                services.AddRazorPages((options) => { options.RootDirectory = razorPath; })
+              .AddNewtonsoftJson();
+
+                services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             }
 
-
-            var tenant1Services = new ServiceCollection();
-            tenant1Services.AddLogging();
-            tenant1Services.AddRouting();
-            tenant1Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-
-            var tenant2Services = new ServiceCollection();
-            tenant2Services.AddRouting();
-            tenant2Services.AddLogging();
-            tenant2Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-
-            tenant1Services.AddRazorPages((options) => { options.RootDirectory = "/T1"; })
-                .AddNewtonsoftJson();
-
-            //tenant1Services.AddRazorPages()
-            //   .AddNewtonsoftJson();
-
-            Tenant1ServiceProvider = tenant1Services.BuildServiceProvider();
-
-            tenant2Services.AddRazorPages((options) => { options.RootDirectory = "/T2"; })
-                .AddNewtonsoftJson();
-
-            Tenant2ServiceProvider = tenant2Services.BuildServiceProvider();
-
+            return services;
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            //if (env.IsDevelopment())
-            //{
-            //    app.UseDeveloperExceptionPage();
-            //}
-            //else
-            //{
-            //    app.UseExceptionHandler("/Error");
-            //    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-            //    // app.UseHsts();
-            //}
-
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
             //  app.UseHttpsRedirection();
             app.UseStaticFiles();
-
-            //app.UseCookiePolicy();
 
             if (!RunInMappedPipeline)
             {
                 app.UseRouting();
-                app.UseAuthorization();
                 app.Use((con, next) =>
                 {
                     var sp = con.RequestServices;
+                    // Note part manager has 4 parts.
                     var partManager = sp.GetRequiredService<ApplicationPartManager>();
                     return next.Invoke();
                 });
                 app.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
-                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-                    var httpContextServices = sp.HttpContext?.RequestServices;
-                    // endpoints.ServiceProvider = httpContextServices;
-
-                    foreach (var dataSource in endpoints.DataSources)
-                    {
-                        foreach (var endpoint in dataSource.Endpoints)
-                        {
-                            var name = endpoint.DisplayName;
-                            foreach (var meta in endpoint.Metadata)
-                            {
-                                var objString = meta.ToString();
-                            }
-                        }
-                    }
                 });
                 return;
             }
@@ -141,27 +107,25 @@ namespace DemoRazorPages
                     return next.Invoke();
                 });
                 branched.UseRouting();
-                branched.UseAuthorization();
                 branched.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
-                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-                    var httpContextServices = sp.HttpContext?.RequestServices;
-                    // endpoints.ServiceProvider = httpContextServices;
+                    //    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    //    var httpContextServices = sp.HttpContext?.RequestServices;
+                    // // endpoints.ServiceProvider = httpContextServices;
 
-                    foreach (var dataSource in endpoints.DataSources)
-                    {
-                        foreach (var endpoint in dataSource.Endpoints)
-                        {
-                            var name = endpoint.DisplayName;
-                            foreach (var meta in endpoint.Metadata)
-                            {
-                                var objString = meta.ToString();
-                            }
-                        }
-                    }
+                    //    foreach (var dataSource in endpoints.DataSources)
+                    //    {
+                    //        foreach (var endpoint in dataSource.Endpoints)
+                    //        {
+                    //            var name = endpoint.DisplayName;
+                    //            foreach (var meta in endpoint.Metadata)
+                    //            {
+                    //                var objString = meta.ToString();
+                    //            }
+                    //        }
+                    //    }
                 });
-
 
                 branched.Use((con, next) =>
                 {
@@ -169,7 +133,6 @@ namespace DemoRazorPages
                     var partManager = sp.GetRequiredService<ApplicationPartManager>();
                     return next.Invoke();
                 });
-                //branched.UseEndpointExecutor();
             });
 
             app.MapWhen((c) =>
@@ -192,26 +155,24 @@ namespace DemoRazorPages
                     return next.Invoke();
                 });
                 branched.UseRouting();
-                branched.UseAuthorization();
-
                 branched.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
-                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-                    var httpContextServices = sp.HttpContext?.RequestServices;
-                    // endpoints.ServiceProvider = httpContextServices;
+                    //var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    //var httpContextServices = sp.HttpContext?.RequestServices;
+                    //// endpoints.ServiceProvider = httpContextServices;
 
-                    foreach (var dataSource in endpoints.DataSources)
-                    {
-                        foreach (var endpoint in dataSource.Endpoints)
-                        {
-                            var name = endpoint.DisplayName;
-                            foreach (var meta in endpoint.Metadata)
-                            {
-                                var objString = meta.ToString();
-                            }
-                        }
-                    }
+                    //foreach (var dataSource in endpoints.DataSources)
+                    //{
+                    //    foreach (var endpoint in dataSource.Endpoints)
+                    //    {
+                    //        var name = endpoint.DisplayName;
+                    //        foreach (var meta in endpoint.Metadata)
+                    //        {
+                    //            var objString = meta.ToString();
+                    //        }
+                    //    }
+                    //}
                 });
 
 
