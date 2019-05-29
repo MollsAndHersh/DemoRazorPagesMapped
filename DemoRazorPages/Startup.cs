@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace DemoRazorPages
@@ -29,8 +28,10 @@ namespace DemoRazorPages
         public void ConfigureServices(IServiceCollection services)
         {
             RegisterApplicationServices(services);
-            Tenant1ServiceProvider = RegisterTenantServices(new ServiceCollection(), "/T1").BuildServiceProvider();
-            Tenant2ServiceProvider = RegisterTenantServices(new ServiceCollection(), "/T2").BuildServiceProvider();
+            var tenant1Services = services.Clone();
+
+            Tenant1ServiceProvider = RegisterTenantServices(tenant1Services, "/T1").BuildServiceProvider();
+            Tenant2ServiceProvider = RegisterTenantServices(tenant1Services, "/T2").BuildServiceProvider();
         }
 
         public void RegisterApplicationServices(IServiceCollection services)
@@ -46,7 +47,7 @@ namespace DemoRazorPages
 
         public IServiceCollection RegisterTenantServices(IServiceCollection services, string razorPath)
         {
-            if(RunInMappedPipeline)
+            if (RunInMappedPipeline)
             {
                 services.AddLogging();
                 services.AddRouting();
@@ -110,21 +111,21 @@ namespace DemoRazorPages
                 branched.UseEndpoints(endpoints =>
                 {
                     endpoints.MapRazorPages();
-                    //    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-                    //    var httpContextServices = sp.HttpContext?.RequestServices;
-                    // // endpoints.ServiceProvider = httpContextServices;
+                    var sp = endpoints.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                    var httpContextServices = sp.HttpContext?.RequestServices;
+                    // endpoints.ServiceProvider = httpContextServices;
 
-                    //    foreach (var dataSource in endpoints.DataSources)
-                    //    {
-                    //        foreach (var endpoint in dataSource.Endpoints)
-                    //        {
-                    //            var name = endpoint.DisplayName;
-                    //            foreach (var meta in endpoint.Metadata)
-                    //            {
-                    //                var objString = meta.ToString();
-                    //            }
-                    //        }
-                    //    }
+                    foreach (var dataSource in endpoints.DataSources)
+                    {
+                        foreach (var endpoint in dataSource.Endpoints)
+                        {
+                            var name = endpoint.DisplayName;
+                            foreach (var meta in endpoint.Metadata)
+                            {
+                                var objString = meta.ToString();
+                            }
+                        }
+                    }
                 });
 
                 branched.Use((con, next) =>
